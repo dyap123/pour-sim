@@ -60,5 +60,6 @@ Running log of everything built, in order. Newest at the bottom.
 
 ## Status / next up
 
+- **2026-06-12 — deployed to GitHub Pages**: https://dyap123.github.io/pour-sim/ (repo `dyap123/pour-sim`), added to the OpenYap Launcher as tile 19 "OpenPour" (POR-4.0.0). Goal: test how it runs on CPU-heavy laptops in the field.
 - **2026-06-12 — user hands-on test pass** of v4 (everything above is headless-verified only, not yet human-tested). Suggested route: ☰ Menu → Scene → 🧪 Test Scene → ⚙ Auto Pour at 5–10× → watch the boom hop footings and the review pop → try `M` realistic mode, the manual tip slider at ~20 ft (splatter), and a saved scene round-trip.
-- Not deployed (local only: `python3 -m http.server 8080` in ~/pour-sim).
+- Perf knobs if weak laptops struggle: stay in Blocks mode (`M`), lower sim speed, smaller scene (32×16×32), hide UI with `H`.
