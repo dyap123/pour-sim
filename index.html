@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenPour — Concrete Pour Simulator</title>
+<style>
+  :root {
+    --bg: rgba(13, 16, 22, 0.78);
+    --bg2: rgba(30, 35, 46, 0.85);
+    --line: rgba(255, 255, 255, 0.10);
+    --txt: #eceef2;
+    --dim: #98a0ae;
+    --acc: #6ea8ff;
+    --acc2: #9b6dff;
+    --grn: #4cc06c;
+    --grad: linear-gradient(135deg, #6ea8ff, #9b6dff);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; color: var(--txt); background: #14171d; }
+  #view { position: fixed; inset: 0; }
+  #view canvas { display: block; }
+  #vignette {
+    position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: radial-gradient(ellipse at 50% 42%, transparent 55%, rgba(8, 10, 16, 0.42) 100%);
+  }
+  svg.ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+  /* ---- top bar ---- */
+  #topbar {
+    position: fixed; top: 0; left: 0; right: 0; height: 44px;
+    display: flex; align-items: center; gap: 16px; padding: 0 14px;
+    background: var(--bg); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line); z-index: 20;
+    font-size: 12.5px; white-space: nowrap;
+  }
+  #topbar .logo { font-weight: 800; font-size: 16px; letter-spacing: 0.3px; }
+  #topbar .logo span {
+    background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .stat { color: var(--dim); }
+  .stat b { color: var(--txt); font-weight: 600; }
+  .iconbtn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 29px; min-width: 31px; padding: 0 7px; border-radius: 8px; flex-shrink: 0;
+    border: 1px solid var(--line); background: var(--bg2); color: var(--dim);
+    cursor: pointer; font-size: 12px; transition: all 0.15s;
+  }
+  .iconbtn svg.ic { width: 15px; height: 15px; }
+  .iconbtn:hover { color: var(--txt); border-color: rgba(255,255,255,0.3); transform: translateY(-1px); }
+  #topbar .fsel { margin-left: auto; }
+  #topbar .fsel-trig { min-height: 30px; padding: 3px 10px; }
+  #btnMenu {
+    font-weight: 600; color: var(--txt);
+    background: linear-gradient(135deg, rgba(110,168,255,0.18), rgba(155,109,255,0.18));
+    border-color: rgba(110,168,255,0.45);
+  }
+
+  /* ---- contextual toolbar ---- */
+  #toolbar {
+    position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+    max-width: calc(100vw - 20px);
+    display: flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: center;
+    background: var(--bg); backdrop-filter: blur(14px);
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 7px 9px; z-index: 18; font-size: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  }
+  .tbtn {
+    width: 52px; height: 48px; border-radius: 11px; position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    border: 1px solid var(--line); background: var(--bg2); color: var(--dim);
+    cursor: pointer; transition: all 0.15s; font-family: inherit;
+  }
+  .tbtn span { font-size: 8.5px; font-weight: 600; letter-spacing: 0.3px; }
+  .tbtn small {
+    position: absolute; top: 3px; right: 5px; font-size: 8px; color: var(--dim);
+    font-family: ui-monospace, monospace; opacity: 0.7;
+  }
+  .tbtn:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.3); color: var(--txt); }
+  .tbtn.active {
+    background: linear-gradient(135deg, rgba(110,168,255,0.30), rgba(155,109,255,0.30));
+    border-color: var(--acc); color: var(--txt);
+    box-shadow: 0 0 14px rgba(110,168,255,0.35);
+  }
+  .tdiv { width: 1px; height: 34px; background: var(--line); margin: 0 3px; }
+  .ctx { display: none; align-items: center; gap: 9px; flex-wrap: wrap; }
+  .ctx label { color: var(--dim); }
+  .ctx .val { color: var(--txt); font-variant-numeric: tabular-nums; font-size: 11.5px; }
+
+  /* ---- controls ---- */
+  button, input[type=number] {
+    background: var(--bg2); color: var(--txt); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 9px; font-size: 12px; cursor: pointer;
+    font-family: inherit; transition: border-color 0.15s;
+  }
+  input[type=number] { cursor: text; }
+  button:hover { border-color: rgba(255,255,255,0.3); }
+  input[type=file] { display: none; }
+
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,0.14); cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: linear-gradient(135deg, #6ea8ff, #9b6dff);
+    box-shadow: 0 0 8px rgba(110,168,255,0.55); border: none;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%; border: none;
+    background: linear-gradient(135deg, #6ea8ff, #9b6dff);
+  }
+
+  input[type=checkbox] {
+    appearance: none; -webkit-appearance: none; width: 34px; height: 19px; border-radius: 10px;
+    background: rgba(255,255,255,0.12); border: 1px solid var(--line);
+    position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0;
+  }
+  input[type=checkbox]::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px;
+    border-radius: 50%; background: #fff; transition: left 0.2s;
+  }
+  input[type=checkbox]:checked { background: linear-gradient(135deg, #6ea8ff, #9b6dff); border-color: transparent; }
+  input[type=checkbox]:checked::after { left: 17px; }
+
+  /* refined dropdowns (fancy.js) */
+  .fsel { position: relative; }
+  .fsel select { display: none; }
+  .fsel-trig {
+    width: 100%; display: flex; align-items: center; gap: 8px; justify-content: space-between;
+    text-align: left; background: var(--bg2); border: 1px solid var(--line); border-radius: 9px;
+    padding: 5px 10px; color: var(--txt); cursor: pointer; font-family: inherit; min-height: 33px;
+    transition: border-color 0.15s;
+  }
+  .fsel-trig:hover { border-color: rgba(255,255,255,0.3); }
+  .fsel-trig svg { color: var(--dim); }
+  .fst { display: flex; flex-direction: column; min-width: 0; }
+  .fst-t { font-weight: 600; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fst-s { font-size: 9.5px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fsel-panel {
+    position: absolute; top: calc(100% + 5px); left: 0; min-width: 100%; width: max-content; max-width: 290px;
+    background: rgba(16, 19, 26, 0.97); border: 1px solid rgba(255,255,255,0.14); border-radius: 12px;
+    padding: 5px; display: none; z-index: 60; max-height: 290px; overflow-y: auto;
+    box-shadow: 0 16px 44px rgba(0,0,0,0.55); backdrop-filter: blur(16px);
+  }
+  .fsel.open .fsel-panel { display: block; }
+  .fsel-it { padding: 6px 9px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; }
+  .fsel-it:hover { background: rgba(110,168,255,0.14); }
+  .fsel-it.on { background: linear-gradient(135deg, rgba(110,168,255,0.24), rgba(155,109,255,0.24)); }
+  .fsel-g {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--dim);
+    padding: 8px 9px 3px;
+  }
+  .fsel-panel::-webkit-scrollbar { width: 6px; }
+  .fsel-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+  #btnStart {
+    padding: 7px 16px; font-size: 13px; font-weight: 700;
+    background: rgba(76,192,108,0.20); border-color: var(--grn); color: #c9f0d4;
+  }
+  #btnStart.pouring { background: rgba(220,80,60,0.25); border-color: #d4604f; color: #f4cfc8; }
+
+  .gauge { width: 110px; height: 7px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .gauge > div { height: 100%; width: 0%; background: var(--grn); transition: width 0.3s, background 0.3s; }
+  #gPsiLbl { font-size: 10.5px; color: var(--dim); }
+  #pressAdv { font-size: 10.5px; color: var(--dim); line-height: 1.4; max-width: 330px; white-space: normal; }
+  #pressAdv b { color: var(--txt); }
+
+  /* ---- full menu overlay ---- */
+  #bigMenu {
+    position: fixed; inset: 0; z-index: 30; display: none;
+    background: rgba(8, 10, 15, 0.62); backdrop-filter: blur(8px);
+    overflow-y: auto; padding: 60px 4vw 40px;
+  }
+  #bigMenu.open { display: block; }
+  #menuGrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px;
+    max-width: 1280px; margin: 0 auto;
+  }
+  .mcard {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 16px;
+    padding: 16px; font-size: 12.5px;
+    box-shadow: 0 10px 36px rgba(0,0,0,0.3);
+  }
+  .mcard h3 {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.4px;
+    margin-bottom: 11px; font-weight: 700; color: var(--acc);
+  }
+  .mcard h3 svg.ic { width: 15px; height: 15px; stroke-width: 1.9; }
+  .mcard input[type=range] { width: 100%; }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .row label { flex: 1; color: var(--dim); }
+  .row .val { color: var(--txt); font-variant-numeric: tabular-nums; }
+  .btnrow { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btnrow button, .btnrow .filebtn { flex: 1; text-align: center; min-width: 62px; }
+  .filebtn {
+    background: var(--bg2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 9px; cursor: pointer; display: inline-block; text-align: center;
+  }
+  .filebtn:hover { border-color: rgba(255,255,255,0.3); }
+  #menuClose {
+    position: fixed; top: 54px; right: 4vw; z-index: 31;
+    width: 34px; height: 34px; border-radius: 50%; font-size: 15px;
+  }
+  .hint { color: var(--dim); font-size: 11px; line-height: 1.45; margin-top: 6px; }
+
+  #mixCard {
+    display: none; margin-top: 8px; padding: 9px 10px; border: 1px solid var(--line);
+    border-radius: 10px; background: rgba(255,255,255,0.03); line-height: 1.5; font-size: 11.5px;
+    color: var(--dim);
+  }
+  #mixCard b { color: var(--txt); }
+  #mixChart { display: none; margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; width: 100%; }
+
+  #groupsList { display: flex; flex-direction: column; gap: 5px; max-height: 220px; overflow-y: auto; }
+  .grow {
+    display: flex; align-items: center; gap: 7px; padding: 6px 8px;
+    border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,0.03);
+  }
+  .grow span { flex: 1; }
+  .grow small { color: var(--dim); }
+  .grow button { padding: 3px 9px; font-size: 11px; }
+
+  /* ---- toast & modals ---- */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--bg); border: 1px solid rgba(110,168,255,0.35); border-radius: 11px;
+    padding: 10px 20px; font-size: 13px; opacity: 0; pointer-events: none;
+    transition: all 0.25s; z-index: 50; backdrop-filter: blur(12px); max-width: 80vw;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #helpModal, #reportModal, #seqModal {
+    position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.55); z-index: 40;
+  }
+  #helpModal.open, #reportModal.open, #seqModal.open { display: flex; }
+  .modalcard {
+    width: min(560px, 92vw); max-height: 84vh; overflow-y: auto;
+    background: #171b22; border: 1px solid var(--line); border-radius: 16px; padding: 22px;
+    font-size: 13px; line-height: 1.55; box-shadow: 0 16px 60px rgba(0,0,0,0.5);
+  }
+  .modalcard h2 { font-size: 16px; margin-bottom: 10px; }
+  .modalcard h4 { margin: 14px 0 4px; color: var(--acc); font-size: 13px; }
+  .modalcard kbd {
+    background: var(--bg2); border: 1px solid var(--line); border-radius: 4px;
+    padding: 1px 6px; font-size: 11px; font-family: ui-monospace, monospace;
+  }
+  .modalcard code {
+    background: var(--bg2); border-radius: 4px; padding: 1px 5px;
+    font-size: 11.5px; font-family: ui-monospace, monospace;
+  }
+  .modalclose { float: right; }
+  .rrow {
+    display: flex; justify-content: space-between; gap: 14px; padding: 7px 0;
+    border-bottom: 1px solid var(--line); font-size: 12.5px;
+  }
+  .rrow span { color: var(--dim); flex-shrink: 0; }
+  .rrow b { font-weight: 500; text-align: right; }
+
+  /* sequence review table */
+  #seqModal .modalcard { width: min(860px, 94vw); }
+  .seqTable {
+    width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .seqTable th {
+    text-align: left; color: var(--dim); font-weight: 600; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.6px; padding: 5px 7px;
+    border-bottom: 1px solid rgba(255,255,255,0.18);
+  }
+  .seqTable td { padding: 6px 7px; border-bottom: 1px solid var(--line); }
+  .seqTable tr:hover td { background: rgba(255,255,255,0.03); }
+
+  /* zen mode — hide the chrome */
+  body.zen #topbar, body.zen #toolbar { display: none; }
+  #zenPill {
+    position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+    display: none; align-items: center; gap: 6px; z-index: 25;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 20px;
+    padding: 5px 14px; font-size: 11px; color: var(--dim); cursor: pointer;
+    backdrop-filter: blur(12px);
+  }
+  body.zen #zenPill { display: flex; }
+  #zenPill:hover { color: var(--txt); border-color: rgba(255,255,255,0.3); }
+  #freeFall { font-size: 11px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="vignette"></div>
+
+<div id="topbar">
+  <div class="logo">Open<span>Pour</span></div>
+  <div class="stat">Placed <b id="stVol">0.0 yd³</b></div>
+  <div class="stat">Trucks <b id="stTrucks">0</b></div>
+  <div class="stat">Forms <b id="stSF">0 / 0 SF</b></div>
+  <div class="stat">Press <b id="stPress">0%</b></div>
+  <div class="stat">Sim <b id="stTime">0:00</b></div>
+  <div class="stat" id="stPump"></div>
+  <select id="mixSelTop" style="max-width:225px;" title="Mix design">
+    <option value="">Manual mix — set in Menu</option>
+  </select>
+  <button id="btnMenu" class="iconbtn">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu
+  </button>
+  <button id="btnReport" class="iconbtn" title="Pour report">
+    <svg class="ic" viewBox="0 0 24 24"><rect x="5.5" y="4.5" width="13" height="16.5" rx="2"/><rect x="9" y="2.8" width="6" height="3.4" rx="1.2"/><path d="M9 11h6M9 14.5h6M9 18h3.5"/></svg>
+  </button>
+  <button id="btnSeqReview" class="iconbtn" title="Pour sequence review (backcheck)">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="M7.5 15.5l3.5-4 3 2.5 5-6.5"/><circle cx="19" cy="7.5" r="1" fill="currentColor"/></svg>
+  </button>
+  <button id="btnZen" class="iconbtn" title="Hide UI (H)">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><path d="M4 4l16 16"/></svg>
+  </button>
+  <button id="btnHelp" class="iconbtn" title="Help">
+    <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.7 2.2c-.8.45-1.3 1-1.3 1.9"/><circle cx="12" cy="16.9" r="0.4" fill="currentColor"/></svg>
+  </button>
+</div>
+
+<div id="toolbar">
+  <button class="tbtn" data-tool="form" title="Build form — drag to draw walls (1)">
+    <svg class="ic" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 9.7h18M3 14.3h18M12 5v4.7M7.5 9.7v4.6M16.5 9.7v4.6M12 14.3V19"/></svg>
+    <span>FORM</span><small>1</small>
+  </button>
+  <button class="tbtn" data-tool="erase" title="Erase blocks — or Alt+click (2)">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L9 19H5.5L4 17.5l-1-1L15.5 4.5z"/><path d="M11.5 8.5l4 4"/><path d="M13 19h8"/></svg>
+    <span>ERASE</span><small>2</small>
+  </button>
+  <button class="tbtn" data-tool="pump" title="Place pump — click open ground (3)">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M2.5 15.5H15v-4H2.5z"/><circle cx="6" cy="17.8" r="1.7"/><circle cx="12" cy="17.8" r="1.7"/><path d="M8.5 11.5C9.5 6.5 15 4.5 20 7.5"/><path d="M20 7.5v4"/></svg>
+    <span>PUMP</span><small>3</small>
+  </button>
+  <button class="tbtn" data-tool="pour" title="Set pour point — click in the form (4)">
+    <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><path d="M12 2.5v3.5M12 18v3.5M2.5 12H6M18 12h3.5"/></svg>
+    <span>POUR</span><small>4</small>
+  </button>
+  <button class="tbtn" data-tool="select" title="Select forms — drag a box, save as group (5)">
+    <svg class="ic" viewBox="0 0 24 24"><rect x="4" y="4" width="14" height="14" rx="2" stroke-dasharray="3.5 3"/><path d="M14 14l6.5 2.3-2.8 1.2-1.2 2.8L14 14z" fill="currentColor" stroke="none"/></svg>
+    <span>SELECT</span><small>5</small>
+  </button>
+  <button class="tbtn" data-tool="place" title="Place a saved group / footing — R rotates (6)">
+    <svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><path d="M17 13.5v7M13.5 17h7"/></svg>
+    <span>PLACE</span><small>6</small>
+  </button>
+  <div class="tdiv"></div>
+
+  <div class="ctx" data-ctx="form">
+    <label>Height</label>
+    <input type="range" id="wallH" min="1" max="20" step="1" value="4" style="width:80px;">
+    <span class="val" id="wallHLbl">4 ft</span>
+    <select id="formClass" style="width:190px;">
+      <option value="0" selected>3/4" ply + ties — 750 psf rating</option>
+      <option value="1">HDO gang form — 1100 psf rating</option>
+      <option value="2">Steel-ply system — 1500 psf rating</option>
+    </select>
+  </div>
+
+  <div class="ctx" data-ctx="erase">
+    <span class="hint" style="margin:0;">Click or drag to remove blocks · Alt+click works with any tool</span>
+  </div>
+
+  <div class="ctx" data-ctx="pump pour">
+    <select id="pumpSel" style="max-width:225px;"></select>
+    <input type="range" id="throttle" min="10" max="100" step="5" value="100" style="width:74px;" title="Volume control">
+    <span class="val" id="throttleLbl"></span>
+    <div class="gauge"><div id="gPsiBar"></div></div>
+    <span id="gPsiLbl"></span>
+  </div>
+
+  <div class="ctx" data-ctx="pour">
+    <select id="tipMode" style="width:118px;" title="Boom tip height — free fall drives splatter & segregation">
+      <option value="auto" selected>Tip auto — rides 3 ft up</option>
+      <option value="manual">Tip manual — set height</option>
+    </select>
+    <span id="tipYWrap" style="display:none;align-items:center;gap:6px;">
+      <input type="range" id="tipY" min="2" max="26" step="1" value="12" style="width:64px;">
+      <span class="val" id="tipYLbl">12 ft</span>
+    </span>
+    <span id="freeFall"></span>
+    <select id="speedSel" style="width:84px;" title="Sim speed">
+      <option value="1">1× — real time</option><option value="2">2× — brisk</option>
+      <option value="5" selected>5× — fast</option><option value="10">10× — very fast</option>
+      <option value="20">20× — time lapse</option>
+    </select>
+    <label title="Physical form failures" style="display:inline-flex;align-items:center;gap:6px;">Blowouts
+      <input type="checkbox" id="chkBlow" checked></label>
+    <label title="Open the backcheck review when auto pour finishes" style="display:inline-flex;align-items:center;gap:6px;">Review
+      <input type="checkbox" id="chkReview" checked></label>
+    <button id="btnStart">▶ Start Pour</button>
+    <button id="btnAutoPour">⚙ Auto Pour</button>
+    <div id="pressAdv"></div>
+  </div>
+
+  <div class="ctx" data-ctx="select">
+    <span class="val" id="selCount">0 selected</span>
+    <button id="btnSaveGroup">Save as group</button>
+    <button id="btnSelToElem">+ Pour element</button>
+    <button id="btnDelSel">Delete</button>
+    <button id="btnClearSel">Clear</button>
+  </div>
+
+  <div class="ctx" data-ctx="place">
+    <select id="groupSel" style="max-width:235px;"></select>
+    <button id="btnRotGroup" title="Rotate (R)">↻ Rotate</button>
+    <span class="hint" style="margin:0;">Click to stamp · manage groups in Menu</span>
+  </div>
+</div>
+
+<div id="bigMenu">
+  <button id="menuClose" class="iconbtn">✕</button>
+  <div id="menuGrid">
+
+    <div class="mcard">
+      <h3><svg class="ic" viewBox="0 0 24 24"><path d="M9.5 3h5M10.5 3v5.2L5 17.5A2 2 0 0 0 6.8 20.5h10.4a2 2 0 0 0 1.8-3L13.5 8.2V3"/><path d="M7.2 14.5h9.6"/></svg>Mix Design</h3>
+      <select id="mixSel"><option value="">Manual — set sliders yourself</option></select>
+      <div class="btnrow" style="margin-top:7px;">
+        <button id="btnMixSync">↻ Break Lab</button>
+        <label class="filebtn">⬆ Mix JSON<input type="file" id="fileMixImport" accept=".json"></label>
+      </div>
+      <div id="mixCard"></div>
+      <canvas id="mixChart" width="238" height="112"></canvas>
+      <div class="row" style="margin-top:9px;"><label>Slump</label><span class="val" id="slumpLbl"></span></div>
+      <input type="range" id="slump" min="2" max="9" step="0.5" value="5">
+      <div class="row" style="margin-top:8px;">
+        <label>Design f'c (psi)</label>
+        <input type="number" id="psiInp" value="4000" min="1000" max="12000" step="500" style="width:84px;">
+      </div>
+      <div class="row">
+        <label>Unit weight (pcf)</label>
+        <input type="number" id="unitWt" value="150" min="100" max="160" step="5" style="width:84px;">
+      </div>
+      <div class="row"><label>Initial set</label><span class="val" id="setTimeLbl"></span></div>
+      <input type="range" id="setTime" min="30" max="240" step="15" value="90">
+      <div class="hint">Pick a real mix to use its break-data strength curve. Wetter mix flows flatter, pumps easier, but loads forms longer.</div>
+    </div>
+
+    <div class="mcard">
+      <h3><svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1"/><rect x="13.5" y="3.5" width="7" height="7" rx="1"/><rect x="3.5" y="13.5" width="7" height="7" rx="1"/><path d="M17 13.5v7M13.5 17h7"/></svg>Groups &amp; Footings</h3>
+      <div id="groupsList"></div>
+      <div class="row" style="margin-top:10px;"><label style="font-weight:600;color:var(--txt);">New footing</label></div>
+      <div class="row">
+        <input type="text" id="bName" placeholder="Name (optional)" style="flex:1;background:var(--bg2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;font-family:inherit;">
+      </div>
+      <div class="row">
+        <label>W × D × H (ft)</label>
+        <input type="number" id="bW" value="6" min="2" max="40" style="width:52px;">
+        <input type="number" id="bD" value="6" min="2" max="40" style="width:52px;">
+        <input type="number" id="bH" value="2" min="1" max="20" style="width:52px;">
+      </div>
+      <select id="bClass">
+        <option value="0" selected>3/4" ply + ties — 750 psf</option>
+        <option value="1">HDO gang — 1100 psf</option>
+        <option value="2">Steel-ply — 1500 psf</option>
+      </select>
+      <div class="btnrow" style="margin-top:7px;">
+        <button id="btnBuildGroup">＋ Create &amp; place</button>
+        <button id="btnGroupsExport">⬇ Export</button>
+        <label class="filebtn">⬆ Import<input type="file" id="fileGroupsImport" accept=".json"></label>
+      </div>
+      <div class="hint">Select forms with the SELECT tool to save them as a group or register them as a pour element. PLACE stamps groups — <kbd style="font-size:10px;">R</kbd> rotates. Every stamp registers a pour element for Auto Pour.</div>
+    </div>
+
+    <div class="mcard">
+      <h3><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 9v12"/></svg>Scene</h3>
+      <select id="sceneSel">
+        <option value="0">Small pad — 32×16×32 ft</option>
+        <option value="1" selected>Standard — 64×24×64 ft</option>
+        <option value="2">Large site — 96×24×96 ft</option>
+        <option value="-1">Custom — set dims below</option>
+      </select>
+      <div class="row" style="margin-top:7px;">
+        <label>X × Y × Z (ft)</label>
+        <input type="number" id="dimX" value="64" min="16" max="128" style="width:52px;">
+        <input type="number" id="dimY" value="24" min="12" max="32" style="width:52px;">
+        <input type="number" id="dimZ" value="64" min="16" max="128" style="width:52px;">
+      </div>
+      <div class="btnrow" style="margin-top:7px;">
+        <button id="btnSceneApply">New scene</button>
+        <button id="btnTestScene">🧪 Test Scene</button>
+      </div>
+      <div class="row" style="margin-top:10px;"><label style="font-weight:600;color:var(--txt);">Saved scenes</label></div>
+      <div class="row">
+        <input type="text" id="sceneName" placeholder="Scene name" style="flex:1;background:var(--bg2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:12px;font-family:inherit;">
+        <button id="btnSceneSave">Save</button>
+      </div>
+      <div id="scenesList"></div>
+      <div class="hint">Scenes store grid size, forms, pump and pour elements. The Test Scene is 3 footings ready for ⚙ Auto Pour — its review proves the sim against hand calcs.</div>
+    </div>
+
+    <div class="mcard">
+      <h3><svg class="ic" viewBox="0 0 24 24"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></svg>View</h3>
+      <div class="row"><label>Render mode <kbd style="font-size:10px;">M</kbd></label></div>
+      <select id="renderMode">
+        <option value="blocks" selected>Blocks — Minecraft voxels</option>
+        <option value="real">Realistic — smooth wet concrete</option>
+      </select>
+      <div class="row" style="margin-top:9px;"><label for="chkGrid">Ground grid</label>
+        <input type="checkbox" id="chkGrid" checked></div>
+    </div>
+
+    <div class="mcard">
+      <h3><svg class="ic" viewBox="0 0 24 24"><path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5V6.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>Plan Overlay</h3>
+      <div class="btnrow">
+        <label class="filebtn">Load image<input type="file" id="fileOverlay" accept="image/*"></label>
+        <button id="btnOvRot">↻ 90°</button>
+        <button id="btnOvClear">Hide</button>
+      </div>
+      <div class="row" style="margin-top:8px;"><label>Opacity</label></div>
+      <input type="range" id="ovOpacity" min="0.1" max="1" step="0.05" value="0.6">
+      <div class="row"><label>Scale</label></div>
+      <input type="range" id="ovScale" min="0.25" max="4" step="0.05" value="1">
+      <div class="hint">Drop a plan or structural drawing on the ground and trace your formwork over it.</div>
+    </div>
+
+    <div class="mcard">
+      <h3><svg class="ic" viewBox="0 0 24 24"><path d="M5 3.5h10.5L19 7v13.5H5z"/><path d="M8.5 3.5V8h7V3.5"/><rect x="8" y="13" width="8" height="7.5"/></svg>Layout</h3>
+      <div class="btnrow">
+        <button id="btnExport">⬇ Export</button>
+        <label class="filebtn">⬆ Import<input type="file" id="fileImport" accept=".json"></label>
+        <button id="btnUndo">↩ Undo</button>
+      </div>
+      <div class="btnrow" style="margin-top:6px;">
+        <button id="btnClearConc">Clear concrete</button>
+        <button id="btnClearAll">Clear all</button>
+      </div>
+      <div class="hint">Give Claude a structural drawing and ask for an OpenPour layout JSON — then Import it here.</div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="helpModal">
+  <div class="modalcard">
+    <button id="helpClose" class="modalclose">✕</button>
+    <h2>OpenPour — how to play</h2>
+    <p>Every block is <b>1 ft³</b>. Build formwork, park a pump, set a pour point, and pour. Concrete falls, flows, and self-levels based on your slump — then takes its initial set and locks.</p>
+    <h4>Camera</h4>
+    <p><kbd>Right-drag</kbd> rotate &nbsp; <kbd>Wheel</kbd> zoom &nbsp; <kbd>W A S D</kbd> pan &nbsp; <kbd>Q</kbd>/<kbd>E</kbd> down/up</p>
+    <h4>Tools</h4>
+    <p><kbd>1</kbd> Build form (drag paints a wall at the set height &amp; class)<br>
+    <kbd>2</kbd> Erase (or <kbd>Alt</kbd>+click with any tool)<br>
+    <kbd>3</kbd> Place pump — boom pumps show their reach circle<br>
+    <kbd>4</kbd> Pour point — must be within boom reach<br>
+    <kbd>5</kbd> Select — drag a box over forms, then save as a group or delete<br>
+    <kbd>6</kbd> Place group — stamp saved groups / footing presets, <kbd>R</kbd> rotates<br>
+    <kbd>Space</kbd> start/stop pour &nbsp; <kbd>M</kbd> render mode &nbsp; <kbd>Ctrl+Z</kbd> undo &nbsp; <kbd>Esc</kbd> clear selection</p>
+    <h4>Engineering model</h4>
+    <p><b>Form pressure</b>: lateral pressure = unit weight × head of still-plastic concrete. Forms tint green → yellow → red toward their class rating (750–1500 psf); sustained overload bursts them (Blowouts toggle). The advisory next to Start Pour shows max head and rise rate for your weakest form.</p>
+    <p><b>Pump pressure</b>: line pressure grows with rate, line length, and stiff mixes, capped by the pump's rated concrete pressure (real Brundage-Bone fleet specs). Over the cap → output derates. Oversized aggregate refuses to pump.</p>
+    <p><b>Strength</b>: pick a mix synced from Break Lab and the gain curve is fitted to your actual cylinder breaks; the pour report predicts stripping and design-strength dates.</p>
+    <h4>Pouring from a structural drawing</h4>
+    <p>1. <b>Plan Overlay</b> — drape a drawing screenshot on the ground and trace it.<br>
+    2. <b>Ask Claude</b> — drop the drawing in a Claude Code chat and import the layout JSON it returns:</p>
+    <p><code>{"app":"openpour","grid":[64,24,64],"forms":[[x,y,z,class],...]}</code></p>
+  </div>
+</div>
+
+<div id="reportModal">
+  <div class="modalcard">
+    <button id="reportClose" class="modalclose">✕</button>
+    <h2>Pour Report</h2>
+    <div id="reportBody"></div>
+  </div>
+</div>
+
+<div id="seqModal">
+  <div class="modalcard">
+    <button id="seqClose" class="modalclose">✕</button>
+    <h2>Pour Sequence Review — Backcheck</h2>
+    <div id="seqBody"></div>
+    <div class="btnrow" style="margin-top:14px;">
+      <button id="btnSeqCsv">⬇ Export CSV</button>
+    </div>
+  </div>
+</div>
+
+<button id="zenPill">
+  <svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px;"><path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></svg>
+  Show UI (H)
+</button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
