@@ -302,6 +302,9 @@
   <div class="stat">Press <b id="stPress">0%</b></div>
   <div class="stat">Sim <b id="stTime">0:00</b></div>
   <div class="stat" id="stPump"></div>
+  <button id="btnQuickSave" class="iconbtn" title="Save pour setup as a scene">
+    <svg class="ic" viewBox="0 0 24 24"><path d="M5 3.5h11l3.5 3.5v13.5H5z"/><path d="M8.5 3.5V8h7V3.5"/><rect x="8" y="13" width="8" height="7.5"/></svg>
+  </button>
   <select id="mixSelTop" style="max-width:225px;" title="Mix design">
     <option value="">Manual mix — set in Menu</option>
   </select>
@@ -366,6 +369,7 @@
 
   <div class="ctx" data-ctx="pump pour">
     <select id="pumpSel" style="max-width:225px;"></select>
+    <button id="btnDelPump" title="Remove the pump from the site">✕ Pump</button>
     <input type="range" id="throttle" min="10" max="100" step="5" value="100" style="width:74px;" title="Volume control">
     <span class="val" id="throttleLbl"></span>
     <div class="gauge"><div id="gPsiBar"></div></div>
@@ -393,6 +397,7 @@
       <input type="checkbox" id="chkReview" checked></label>
     <button id="btnStart">▶ Start Pour</button>
     <button id="btnAutoPour">⚙ Auto Pour</button>
+    <button id="btnNewPour" title="Clear concrete and reset the clock — forms, pump and elements stay">🆕 New Pour</button>
     <div id="pressAdv"></div>
   </div>
 

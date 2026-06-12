@@ -58,6 +58,14 @@ Running log of everything built, in order. Newest at the bottom.
 
 ---
 
+## 2026-06-12 · v4.1 — QoL: pour workflow
+
+- **Sim clock gated to the pour**: `simTime` only advances after the first Start/Auto Pour (`simStarted` flag, early-return in `tick`). Clear concrete / New Pour / new scenes reset it to 0:00.
+- **🆕 New Pour** (pour toolbar): clears concrete + resets the clock, keeps forms, pump and elements — re-pour the same setup instantly.
+- **💾 Quick save** (topbar): saves the current setup as a named scene in one click (same store as ☰ Menu → Scene).
+- **✕ Pump** (pump toolbar): removes the pump/boom/pour point. Repositioning was already click-to-re-place with tool 3; Start Pour now re-validates reach in case the pump moved after the pour point was set.
+- Selftests: all 13 tokens unchanged and passing.
+
 ## Status / next up
 
 - **2026-06-12 — deployed to GitHub Pages**: https://dyap123.github.io/pour-sim/ (repo `dyap123/pour-sim`), added to the OpenYap Launcher as tile 19 "OpenPour" (POR-4.0.0). Goal: test how it runs on CPU-heavy laptops in the field.

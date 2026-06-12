@@ -72,6 +72,7 @@ const S = {
 };
 
 let simTime = 0;
+let simStarted = false;    // the sim clock only runs once a pour has begun
 let pouring = false;
 let spawnAcc = 0;
 let placedFt3 = 0;                 // UI net volume (decrements on erase)
@@ -856,6 +857,7 @@ function startAutoPour() {
     cur = { x: el.analysis.pourCol[0] + 0.5, z: el.analysis.pourCol[1] + 0.5 };
   }
   autoPour = { order, k: -1, phase: 'travel', travelT: 0, travelDur: 0, from: null, to: null, startSim: simTime };
+  simStarted = true;
   beginTravelToNext();
   toast(`Auto pour — ${order.length} element${order.length > 1 ? 's' : ''}, nearest first`);
   updateStartBtns();
@@ -969,6 +971,7 @@ function checkManualFill() {
 }
 
 function tick(dt) {
+  if (!simStarted) return;   // clock starts with the first pour
   // Sub-step at high sim speeds so flow keeps pace with the spawn rate
   // (concrete drops at most 1 cell per flow pass).
   const sub = Math.max(1, Math.min(8, Math.round(S.speed / 4)));
@@ -1017,7 +1020,14 @@ function startPour() {
     toast(`${S.aggIn}" aggregate won't pump through the ${pump.name} — ${pump.maxAgg}" max`);
     return;
   }
+  // the pump may have been moved since the pour point was set
+  const reachD = Math.hypot(pourPt.x + 0.5 - pumpPos.x, pourPt.z + 0.5 - pumpPos.z);
+  if (reachD > pump.reach) {
+    toast(`Pour point out of reach — ${reachD.toFixed(0)} ft > ${pump.reach} ft boom`);
+    return;
+  }
   pumpHydraulics();
+  simStarted = true;
   pouring = true;
   spawnFails = 0;
   pour = { startSim: simTime, startVol: placedFt3, peakUtil: 0, peakPsf: 0, blowouts0: blowouts };
@@ -1604,7 +1614,7 @@ function reinitWorld(gx, gy, gz) {
   formSet.clear();
   active.clear();
   undoStack.length = 0;
-  simTime = 0; placedFt3 = 0; blowouts = 0; spawnAcc = 0; spawnFails = 0; pressAcc = 0; elemCheck = 0;
+  simTime = 0; simStarted = false; placedFt3 = 0; blowouts = 0; spawnAcc = 0; spawnFails = 0; pressAcc = 0; elemCheck = 0;
   spawnedFt3Total = 0; erasedFt3Total = 0; ft3OverDrop = 0;
   cMin = [GX, GY, GZ]; cMax = [-1, -1, -1];
   elements = []; nextElemId = 1; activeElem = null;
@@ -1729,6 +1739,26 @@ $('speedSel').addEventListener('change', (e) => { S.speed = +e.target.value; });
 $('chkBlow').addEventListener('change', (e) => { S.blowoutsOn = e.target.checked; });
 $('btnStart').addEventListener('click', () => (pouring ? stopPour() : startPour()));
 $('btnAutoPour').addEventListener('click', startAutoPour);
+$('btnDelPump').addEventListener('click', removePump);
+
+// new pour: keep forms, pump and elements — fresh concrete + clock
+$('btnNewPour').addEventListener('click', () => {
+  clearConcrete(false);
+  toast('New pour ready — forms & pump kept, clock at 0:00. Hit Start or Auto Pour.');
+});
+
+// quick-save the current setup as a named scene
+$('btnQuickSave').addEventListener('click', () => {
+  const name = prompt('Save pour setup as:', sceneName === 'Standard' ? 'My pour' : sceneName);
+  if (!name) return;
+  sceneName = name;
+  const s = loadSavedScenes();
+  s[name] = layoutJSON();
+  try { localStorage.setItem('openpour_scenes', JSON.stringify(s)); } catch (e) { toast('Storage full'); return; }
+  renderScenesUI();
+  saveLocal();
+  toast(`"${name}" saved — reload it anytime from ☰ Menu → Scene`);
+});
 
 function updateStartBtns() {
   const pend = elements.filter((e) => e.status !== 'done').length;
@@ -1777,10 +1807,27 @@ function clearConcrete(announce) {
   active.clear();
   spawnAcc = 0;
   placedFt3 = 0;
+  simTime = 0;
+  simStarted = false;
+  pressAcc = 0;
+  elemCheck = 0;
+  pour = null;
   for (const el of elements) { el.status = 'pending'; el.result = null; el.validation = null; }
   markConc();
   updateStartBtns();
-  if (announce) toast('Concrete cleared — elements reset to pending');
+  if (announce) toast('Concrete cleared — elements reset, sim clock back to 0:00');
+}
+
+function removePump() {
+  stopPour();
+  cancelAutoPour();
+  pumpPos = null;
+  pourPt = null;
+  truck.visible = false;
+  reachRing.visible = false;
+  pourMarker.visible = false;
+  if (boomMesh) { scene.remove(boomMesh); boomMesh.geometry.dispose(); boomMesh = null; }
+  toast('Pump removed — park a new one with tool 3');
 }
 
 function clearAll() {
@@ -1794,6 +1841,11 @@ function clearAll() {
   active.clear();
   spawnAcc = 0;
   placedFt3 = 0;
+  simTime = 0;
+  simStarted = false;
+  pressAcc = 0;
+  elemCheck = 0;
+  pour = null;
   blowouts = 0;
   spawnedFt3Total = 0; erasedFt3Total = 0; ft3OverDrop = 0;
   cMin = [GX, GY, GZ]; cMax = [-1, -1, -1];
