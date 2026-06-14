@@ -71,3 +71,16 @@ Running log of everything built, in order. Newest at the bottom.
 - **2026-06-12 — deployed to GitHub Pages**: https://dyap123.github.io/pour-sim/ (repo `dyap123/pour-sim`), added to the OpenYap Launcher as tile 19 "OpenPour" (POR-4.0.0). Goal: test how it runs on CPU-heavy laptops in the field.
 - **2026-06-12 — user hands-on test pass** of v4 (everything above is headless-verified only, not yet human-tested). Suggested route: ☰ Menu → Scene → 🧪 Test Scene → ⚙ Auto Pour at 5–10× → watch the boom hop footings and the review pop → try `M` realistic mode, the manual tip slider at ~20 ft (splatter), and a saved scene round-trip.
 - Perf knobs if weak laptops struggle: stay in Blocks mode (`M`), lower sim speed, smaller scene (32×16×32), hide UI with `H`.
+
+---
+
+## Session close — 2026-06-14
+
+Everything through v4.1 is committed, pushed to `dyap123/pour-sim`, and live on GitHub Pages + the launcher (tile 19). Working tree clean. 13/13 selftests pass locally and against the live URL. Safe to close.
+
+**Repo docs**: `DEVLOG.md` (this file, build history) · `ARCHITECTURE.md` (system map, physics models, §10 diagnostic backlog) · `README.md` (user guide).
+
+**Open threads for next session** (not blocking):
+- Field test on CPU-heavy laptops still pending — capture ms/frame impressions to feed the perf items in ARCHITECTURE §10 (esp. #6 `rebuildForms` full-grid scan, #7 grow-only bbox).
+- Security follow-up flagged this session (separate from OpenPour): shared Firebase RTDB `gen-lang-client-0119642855` is unauthenticated read/write — backup taken at `~/firebase-backups/rtdb-full-20260612-0728.json`; recurring backup cron + security rules + anon-auth not yet set up.
+- Top improvement candidates from ARCHITECTURE §10: per-cell `supported` bit (replaces the in-flight/settled heuristics), temperature input for set/pressure, optional Firebase scene/group sync.
